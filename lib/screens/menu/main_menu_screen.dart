@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import '../../config/theme.dart';
-import '../../config/constants.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import '../../core/constants.dart';
 import '../../data/characters.dart';
 import '../../models/game_state.dart';
-import '../game/game_screen.dart';
 import '../story/character_select_screen.dart';
+import '../game/game_screen.dart';
 import '../settings/settings_screen.dart';
 
-/// Pantalla del menú principal
-/// Diseño: Carta roja central (XI) con opciones, cartas azules formando arco (personajes)
+/// Menú principal según GDD v1.3
+/// Arco de 11 cartas con siluetas. Carta roja central = menú.
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
 
@@ -18,122 +18,40 @@ class MainMenuScreen extends StatefulWidget {
 
 class _MainMenuScreenState extends State<MainMenuScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulseAnimation;
-  int _selectedIndex = -1;
-
-  final List<_MenuOption> _menuOptions = [
-    _MenuOption(
-      title: AppStrings.storyMode,
-      subtitle: 'Narrativa lineal, 7 rondas',
-      icon: Icons.auto_stories,
-      mode: GameMode.story,
-    ),
-    _MenuOption(
-      title: AppStrings.freePlay,
-      subtitle: 'Partidas infinitas con apuestas',
-      icon: Icons.casino,
-      mode: GameMode.freePlay,
-    ),
-    _MenuOption(
-      title: AppStrings.gambleFree,
-      subtitle: 'Sin riesgos, para pasar el tiempo',
-      icon: Icons.sports_esports,
-      mode: GameMode.gambleFree,
-    ),
-    _MenuOption(
-      title: AppStrings.settings,
-      subtitle: 'Configuración',
-      icon: Icons.settings,
-      mode: null,
-    ),
-  ];
+  late AnimationController _pulseController;
+  int? _hoveredCardIndex;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
-
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pulseController.dispose();
     super.dispose();
-  }
-
-  void _onMenuItemTap(_MenuOption option) {
-    if (option.mode == null) {
-      // Settings
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const SettingsScreen()),
-      );
-    } else if (option.mode == GameMode.story) {
-      // Story Mode - ir a selección de personaje
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CharacterSelectScreen()),
-      );
-    } else {
-      // Free Play o Gamble Free - ir directo al juego
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => GameScreen(
-            gameState: GameState.newGame(mode: option.mode!),
-          ),
-        ),
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: XITheme.background,
+      backgroundColor: XIColors.background,
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
-            // Título XI
-            _buildTitle(),
-            const SizedBox(height: 20),
-            // Subtítulo
-            Text(
-              '"Todos llegan aquí tarde o temprano."',
-              style: TextStyle(
-                color: XITheme.textMuted,
-                fontSize: 12,
-                fontStyle: FontStyle.italic,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-            // Cartas de personajes (arco superior)
+            const Spacer(flex: 1),
+            // Arco de cartas de personajes (cartas 1-10)
             _buildCharacterArc(),
-            const Spacer(),
-            // Opciones del menú
-            _buildMenuOptions(),
-            const SizedBox(height: 40),
-            // Créditos
-            TextButton(
-              onPressed: () => _showCredits(context),
-              child: const Text(
-                'CREDITS',
-                style: TextStyle(
-                  color: XITheme.textMuted,
-                  fontSize: 12,
-                  letterSpacing: 2,
-                ),
-              ),
-            ),
+            const SizedBox(height: 20),
+            // Carta roja central con menú (carta 11)
+            _buildCentralMenuCard(),
+            const Spacer(flex: 2),
+            // Quote de The Gatekeeper
+            _buildGatekeeperQuote(),
             const SizedBox(height: 20),
           ],
         ),
@@ -141,299 +59,380 @@ class _MainMenuScreenState extends State<MainMenuScreen>
     );
   }
 
-  Widget _buildTitle() {
-    return AnimatedBuilder(
-      animation: _pulseAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _pulseAnimation.value,
-          child: ShaderMask(
-            shaderCallback: (bounds) => LinearGradient(
-              colors: [
-                XITheme.primary,
-                XITheme.primaryLight,
-                XITheme.primary,
-              ],
-              stops: const [0.0, 0.5, 1.0],
-            ).createShader(bounds),
-            child: const Text(
-              'XI',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 80,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 15,
+  /// Arco de 10 cartas con siluetas de personajes
+  Widget _buildCharacterArc() {
+    return SizedBox(
+      height: 140,
+      child: Stack(
+        alignment: Alignment.center,
+        children: List.generate(10, (index) {
+          final angle = (index - 4.5) * 0.1;
+          final yOffset = (index - 4.5).abs() * 6;
+          final xOffset = (index - 4.5) * 38;
+
+          return Transform.translate(
+            offset: Offset(xOffset, yOffset),
+            child: Transform.rotate(
+              angle: angle,
+              child: GestureDetector(
+                onTap: () => _onCardTap(index),
+                onTapDown: (_) => setState(() => _hoveredCardIndex = index),
+                onTapUp: (_) => setState(() => _hoveredCardIndex = null),
+                onTapCancel: () => setState(() => _hoveredCardIndex = null),
+                child: _buildCharacterCard(index),
               ),
             ),
-          ),
-        );
-      },
+          )
+              .animate(delay: Duration(milliseconds: index * 50))
+              .fadeIn(duration: 300.ms)
+              .slideY(begin: -0.5, end: 0, duration: 400.ms);
+        }),
+      ),
     );
   }
 
-  Widget _buildCharacterArc() {
-    return SizedBox(
-      height: 120,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Personajes desbloqueados y bloqueados
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Owen (As)
-              _buildCharacterCard(
-                character: owen,
-                isUnlocked: true,
-                rotation: -0.15,
-              ),
-              // Nora (2)
-              _buildCharacterCard(
-                character: nora,
-                isUnlocked: true,
-                rotation: -0.08,
-              ),
-              // Cartas bloqueadas (3-10)
-              for (int i = 3; i <= 6; i++)
-                _buildLockedCard(
-                  number: i,
-                  rotation: (i - 4.5) * 0.08,
+  /// Carta de personaje con silueta integrada
+  Widget _buildCharacterCard(int index) {
+    final isUnlocked = index < 2; // Solo Owen y Nora desbloqueados
+    final isHovered = _hoveredCardIndex == index;
+    final isOwenReturns = index == 10; // Carta 11
+
+    // Datos del personaje
+    final cardValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    final names = ['OWEN', 'NORA', '???', '???', '???', '???', '???', '???', '???', '???'];
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: 55,
+      height: 80,
+      transform: isHovered ? (Matrix4.identity()..scale(1.1)) : Matrix4.identity(),
+      decoration: BoxDecoration(
+        color: XIColors.cardBlue,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: isUnlocked
+              ? (isHovered ? XIColors.primaryLight : XIColors.primary)
+              : XIColors.textMuted.withValues(alpha: 0.3),
+          width: isHovered ? 2 : 1,
+        ),
+        boxShadow: isHovered
+            ? [
+                BoxShadow(
+                  color: XIColors.primary.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  spreadRadius: 2,
                 ),
-            ],
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 4,
+                  offset: const Offset(1, 2),
+                ),
+              ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Valor de la carta
+          Text(
+            cardValues[index],
+            style: TextStyle(
+              color: isUnlocked ? XIColors.primary : XIColors.textMuted.withValues(alpha: 0.5),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Silueta del personaje
+          _buildSilhouette(index, isUnlocked),
+          const SizedBox(height: 4),
+          // Nombre del personaje
+          Text(
+            names[index],
+            style: TextStyle(
+              color: isUnlocked
+                  ? XIColors.textSecondary
+                  : XIColors.textMuted.withValues(alpha: 0.4),
+              fontSize: 7,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCharacterCard({
-    required StoryCharacter character,
-    required bool isUnlocked,
-    required double rotation,
-  }) {
-    return Transform.rotate(
-      angle: rotation,
-      child: GestureDetector(
-        onTap: isUnlocked
-            ? () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GameScreen(
-                      gameState: GameState.newGame(
-                        mode: GameMode.story,
-                        characterId: character.id,
-                      ),
-                    ),
-                  ),
-                );
-              }
-            : null,
-        child: Container(
-          width: 50,
-          height: 75,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: XITheme.cardBlue,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(
-              color: isUnlocked ? XITheme.primary : XITheme.textMuted,
-              width: 1,
+  /// Silueta del personaje (pixel art simplificado)
+  Widget _buildSilhouette(int index, bool isUnlocked) {
+    if (!isUnlocked) {
+      // Silueta con signo de interrogación para personajes bloqueados
+      return Container(
+        width: 30,
+        height: 25,
+        decoration: BoxDecoration(
+          color: XIColors.background.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(2),
+        ),
+        child: const Center(
+          child: Text(
+            '?',
+            style: TextStyle(
+              color: XIColors.textMuted,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
             ),
-            boxShadow: isUnlocked
-                ? [
-                    BoxShadow(
-                      color: XITheme.primary.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                character.cardValue == 1 ? 'A' : '${character.cardValue}',
-                style: TextStyle(
-                  color: XITheme.primary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                character.name.split(' ')[0],
-                style: TextStyle(
-                  color: XITheme.textSecondary,
-                  fontSize: 8,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
           ),
         ),
+      );
+    }
+
+    // Siluetas específicas para Owen y Nora
+    return Container(
+      width: 30,
+      height: 25,
+      decoration: BoxDecoration(
+        color: XIColors.background.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: CustomPaint(
+        painter: _SilhouettePainter(characterIndex: index),
       ),
     );
   }
 
-  Widget _buildLockedCard({required int number, required double rotation}) {
-    return Transform.rotate(
-      angle: rotation,
+  /// Carta roja central con las opciones del menú
+  Widget _buildCentralMenuCard() {
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final scale = 1.0 + (_pulseController.value * 0.02);
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
       child: Container(
-        width: 50,
-        height: 75,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        width: 140,
+        height: 200,
         decoration: BoxDecoration(
-          color: XITheme.surface,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: XITheme.textMuted.withValues(alpha: 0.3), width: 1),
+          color: XIColors.cardRed,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: XIColors.secondary, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: XIColors.secondary.withValues(alpha: 0.3),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 10,
+              offset: const Offset(2, 4),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              '$number',
+            // Título XI
+            const Text(
+              'XI',
               style: TextStyle(
-                color: XITheme.textMuted.withValues(alpha: 0.5),
-                fontSize: 20,
+                color: XIColors.primary,
+                fontSize: 36,
                 fontWeight: FontWeight.bold,
+                letterSpacing: 4,
               ),
             ),
             const SizedBox(height: 4),
-            Icon(
-              Icons.lock,
-              color: XITheme.textMuted.withValues(alpha: 0.5),
-              size: 12,
+            Container(
+              width: 60,
+              height: 1,
+              color: XIColors.primary.withValues(alpha: 0.5),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMenuOptions() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: _menuOptions.asMap().entries.map((entry) {
-        final index = entry.key;
-        final option = entry.value;
-        final isSelected = _selectedIndex == index;
-
-        return GestureDetector(
-          onTapDown: (_) => setState(() => _selectedIndex = index),
-          onTapUp: (_) {
-            setState(() => _selectedIndex = -1);
-            _onMenuItemTap(option);
-          },
-          onTapCancel: () => setState(() => _selectedIndex = -1),
-          child: AnimatedContainer(
-            duration: XIAnimations.fast,
-            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? XITheme.primary.withValues(alpha: 0.2)
-                  : XITheme.surface.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isSelected
-                    ? XITheme.primary
-                    : XITheme.textMuted.withValues(alpha: 0.3),
-                width: isSelected ? 2 : 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  option.icon,
-                  color: isSelected ? XITheme.primary : XITheme.textSecondary,
-                  size: 24,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        option.title,
-                        style: TextStyle(
-                          color: isSelected
-                              ? XITheme.primary
-                              : XITheme.textPrimary,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      Text(
-                        option.subtitle,
-                        style: TextStyle(
-                          color: XITheme.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
+            const SizedBox(height: 16),
+            // Opciones del menú
+            _buildMenuOption('STORY MODE', Icons.auto_stories, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CharacterSelectScreen()),
+              );
+            }),
+            _buildMenuOption('FREE PLAY', Icons.casino, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GameScreen(
+                    gameState: GameState.newGame(mode: GameMode.freePlay),
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: isSelected ? XITheme.primary : XITheme.textMuted,
+              );
+            }),
+            _buildMenuOption('GAMBLE FREE', Icons.sports_esports, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => GameScreen(
+                    gameState: GameState.newGame(mode: GameMode.gambleFree),
+                  ),
                 ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
+              );
+            }),
+            const SizedBox(height: 8),
+            _buildMenuOption('SETTINGS', Icons.settings, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+            }, small: true),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(delay: 500.ms, duration: 400.ms)
+        .scale(begin: const Offset(0.8, 0.8), end: const Offset(1, 1), duration: 400.ms);
   }
 
-  void _showCredits(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: XITheme.surface,
-        title: const Text(
-          'XI',
-          style: TextStyle(color: XITheme.primary),
-          textAlign: TextAlign.center,
+  Widget _buildMenuOption(
+    String text,
+    IconData icon,
+    VoidCallback onTap, {
+    bool small = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: small ? 2 : 4,
         ),
-        content: const Column(
+        padding: EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: small ? 4 : 6,
+        ),
+        decoration: BoxDecoration(
+          color: XIColors.background.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: XIColors.primary.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Un juego de cartas de horror y suspenso psicológico',
-              style: TextStyle(color: XITheme.textSecondary),
-              textAlign: TextAlign.center,
+            Icon(
+              icon,
+              color: XIColors.primary,
+              size: small ? 12 : 14,
             ),
-            SizedBox(height: 16),
+            const SizedBox(width: 6),
             Text(
-              'Desarrollado con Flutter',
-              style: TextStyle(color: XITheme.textMuted, fontSize: 12),
-              textAlign: TextAlign.center,
+              text,
+              style: TextStyle(
+                color: XIColors.textPrimary,
+                fontSize: small ? 9 : 10,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CERRAR'),
-          ),
-        ],
       ),
     );
+  }
+
+  /// Quote de The Gatekeeper
+  Widget _buildGatekeeperQuote() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40),
+      child: Text(
+        XIStrings.gatekeeperQuote,
+        style: TextStyle(
+          color: XIColors.textMuted.withValues(alpha: 0.6),
+          fontSize: 11,
+          fontStyle: FontStyle.italic,
+          height: 1.4,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    )
+        .animate(delay: 800.ms)
+        .fadeIn(duration: 600.ms);
+  }
+
+  void _onCardTap(int index) {
+    if (index < 2) {
+      // Personaje desbloqueado - ir a selección
+      final character = index == 0 ? owen : nora;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CharacterSelectScreen(preselectedCharacter: character),
+        ),
+      );
+    } else {
+      // Personaje bloqueado - mostrar mensaje
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Próximamente...'),
+          backgroundColor: XIColors.surface,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
   }
 }
 
-class _MenuOption {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final GameMode? mode;
+/// Painter para siluetas de personajes
+class _SilhouettePainter extends CustomPainter {
+  final int characterIndex;
 
-  _MenuOption({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    this.mode,
-  });
+  _SilhouettePainter({required this.characterIndex});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = XIColors.textMuted.withValues(alpha: 0.8)
+      ..style = PaintingStyle.fill;
+
+    final centerX = size.width / 2;
+    final centerY = size.height / 2;
+
+    if (characterIndex == 0) {
+      // Owen: silueta sentada con cabeza inclinada sobre mesa
+      // Cabeza
+      canvas.drawCircle(Offset(centerX, centerY - 4), 5, paint);
+      // Cuerpo inclinado
+      canvas.drawRect(
+        Rect.fromLTWH(centerX - 6, centerY, 12, 10),
+        paint,
+      );
+      // Mesa (línea horizontal)
+      canvas.drawRect(
+        Rect.fromLTWH(2, size.height - 4, size.width - 4, 2),
+        paint,
+      );
+    } else if (characterIndex == 1) {
+      // Nora: silueta de pie con clipboard
+      // Cabeza
+      canvas.drawCircle(Offset(centerX, centerY - 6), 4, paint);
+      // Cuerpo de pie
+      canvas.drawRect(
+        Rect.fromLTWH(centerX - 5, centerY - 2, 10, 14),
+        paint,
+      );
+      // Clipboard
+      canvas.drawRect(
+        Rect.fromLTWH(centerX + 4, centerY + 2, 4, 6),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

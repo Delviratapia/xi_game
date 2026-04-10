@@ -1,6 +1,25 @@
-/// Personajes del Modo Historia
-/// Cada personaje tiene una historia independiente de 7 rondas
+/// Personajes del Modo Historia según GDD v1.3
+/// Cada personaje tiene escena introductoria + historia de 7 rondas
 
+/// Tipo de línea de diálogo
+enum DialogueType {
+  dialogue,        // Texto hablado por el personaje
+  stage,           // Stage direction (acción/descripción)
+  transitionStart, // Última línea antes de la transición de muerte
+}
+
+/// Línea de diálogo individual
+class DialogueLine {
+  final DialogueType type;
+  final String text;
+
+  const DialogueLine({
+    required this.type,
+    required this.text,
+  });
+}
+
+/// Personaje de la historia
 class StoryCharacter {
   final String id;
   final String name;
@@ -8,11 +27,14 @@ class StoryCharacter {
   final String origin;
   final String occupation;
   final String deathDescription;
-  final int cardValue; // Qué carta representa (As = 1, etc.)
+  final String selectDescription; // Descripción sin spoiler para pantalla de selección
+  final int cardValue;
+  final List<DialogueLine> introScene; // Escena del personaje vivo
   final List<StoryFragment> fragments;
   final String plotTwist;
   final List<StoryEnding> endings;
   final List<String> gatekeeperQuotes;
+  final CharacterEnvironment environment;
   final bool isUnlocked;
 
   const StoryCharacter({
@@ -22,12 +44,34 @@ class StoryCharacter {
     required this.origin,
     required this.occupation,
     required this.deathDescription,
+    required this.selectDescription,
     required this.cardValue,
+    required this.introScene,
     required this.fragments,
     required this.plotTwist,
     required this.endings,
     required this.gatekeeperQuotes,
+    required this.environment,
     this.isUnlocked = false,
+  });
+}
+
+/// Ambiente visual del personaje
+class CharacterEnvironment {
+  final String backgroundSprite;
+  final String tableSprite;
+  final String lightType;
+  final List<String> particles;
+  final String gatekeeperVariant;
+  final String musicTheme;
+
+  const CharacterEnvironment({
+    required this.backgroundSprite,
+    required this.tableSprite,
+    required this.lightType,
+    required this.particles,
+    required this.gatekeeperVariant,
+    required this.musicTheme,
   });
 }
 
@@ -35,12 +79,16 @@ class StoryFragment {
   final int round;
   final String title;
   final String content;
+  final String winText;
+  final String loseText;
   final bool isPlotTwist;
 
   const StoryFragment({
     required this.round,
     required this.title,
     required this.content,
+    this.winText = '',
+    this.loseText = '',
     this.isPlotTwist = false,
   });
 }
@@ -48,10 +96,10 @@ class StoryFragment {
 class StoryEnding {
   final String id;
   final String title;
-  final int minWins; // Mínimo de rondas ganadas
-  final int maxWins; // Máximo de rondas ganadas
+  final int minWins;
+  final int maxWins;
   final String description;
-  final String? playerChoice; // Elección del jugador si aplica
+  final String? playerChoice;
 
   const StoryEnding({
     required this.id,
@@ -63,7 +111,10 @@ class StoryEnding {
   });
 }
 
-/// Owen - El Músico (As, Carta 1)
+// ============================================
+// OWEN - El Músico (As, Carta 1)
+// ============================================
+
 const owen = StoryCharacter(
   id: 'owen',
   name: 'Owen',
@@ -71,8 +122,27 @@ const owen = StoryCharacter(
   origin: 'Europeo',
   occupation: 'Músico olvidado',
   deathDescription: 'Solo en su apartamento. Nadie lo notó por tres días.',
+  selectDescription: 'Un músico que murió un martes. Nadie lo notó hasta el viernes.',
   cardValue: 1,
   isUnlocked: true,
+  environment: CharacterEnvironment(
+    backgroundSprite: 'owen_apartment',
+    tableSprite: 'owen_desk',
+    lightType: 'lamp_warm',
+    particles: ['rain', 'papers'],
+    gatekeeperVariant: 'violin_scythe',
+    musicTheme: 'owen_theme',
+  ),
+  introScene: [
+    DialogueLine(type: DialogueType.dialogue, text: 'Otra noche sin terminarla.'),
+    DialogueLine(type: DialogueType.stage, text: '(mira las partituras esparcidas sobre el escritorio)'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Siempre digo que mañana.'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Y mañana nunca llega.'),
+    DialogueLine(type: DialogueType.stage, text: '(apaga la lámpara un momento, la vuelve a encender)'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Solo cinco minutos.'),
+    DialogueLine(type: DialogueType.stage, text: '(se recuesta lentamente sobre el escritorio, cierra los ojos)'),
+    DialogueLine(type: DialogueType.transitionStart, text: '...solo cinco minutos.'),
+  ],
   fragments: [
     StoryFragment(
       round: 1,
@@ -87,6 +157,8 @@ Las notas flotan en el vacío, incompletas, como tú.
 The Gatekeeper observa mientras barajas. No dice nada.
 Todavía no.
 ''',
+      winText: 'Un nombre. Owen. Las notas empiezan a tener sentido.',
+      loseText: 'El nombre se escapa. Como siempre.',
     ),
     StoryFragment(
       round: 2,
@@ -100,6 +172,8 @@ llenaba habitaciones enteras, pequeñas manos tocando el piano junto a ti.
 "¿La recuerdas?" pregunta The Gatekeeper, sin mirarte.
 "¿O solo recuerdas cómo querías que te recordara?"
 ''',
+      winText: 'Lily. Su risa. El piano.',
+      loseText: 'La risa se desvanece antes de poder atraparla.',
     ),
     StoryFragment(
       round: 3,
@@ -114,6 +188,8 @@ Las visitas se hicieron menos frecuentes.
 Luego mensuales.
 Luego... nada.
 ''',
+      winText: 'Las excusas. Todas las excusas que te dijiste.',
+      loseText: 'Preferías olvidar por qué dejaste de ir.',
     ),
     StoryFragment(
       round: 4,
@@ -128,6 +204,8 @@ Ninguna fue enviada.
 The Gatekeeper sonríe levemente. "¿Qué es más difícil?
 ¿Escribir una disculpa o vivir sin necesitarla?"
 ''',
+      winText: 'Cada carta era una confesión incompleta.',
+      loseText: 'Las palabras que nunca escribiste.',
     ),
     StoryFragment(
       round: 5,
@@ -143,6 +221,8 @@ Y no fuiste.
 
 ¿Por qué? El recuerdo se nubla. Hay algo que no quieres ver.
 ''',
+      winText: 'La llamada. La promesa rota. Otra vez.',
+      loseText: 'Hay cosas que prefieres no recordar.',
     ),
     StoryFragment(
       round: 6,
@@ -160,6 +240,8 @@ Lo elegiste.
 
 The Gatekeeper te observa sin parpadear.
 ''',
+      winText: 'Elegiste la canción. Elegiste el silencio.',
+      loseText: 'Algunas verdades duelen demasiado.',
     ),
     StoryFragment(
       round: 7,
@@ -241,7 +323,10 @@ The Gatekeeper recoge las cartas y se va sin decir nada.
   ],
 );
 
-/// Nora Salcedo - La Enfermera (Carta 2)
+// ============================================
+// NORA SALCEDO - La Enfermera (Carta 2)
+// ============================================
+
 const nora = StoryCharacter(
   id: 'nora',
   name: 'Nora Salcedo',
@@ -249,8 +334,28 @@ const nora = StoryCharacter(
   origin: 'Latina',
   occupation: 'Enfermera de noche, 14 años de servicio',
   deathDescription: 'Respetada, con flores en su funeral. Nadie sospechó nunca.',
+  selectDescription: 'Catorce años de servicio. Murió respetada. Nunca fue juzgada en vida.',
   cardValue: 2,
   isUnlocked: true,
+  environment: CharacterEnvironment(
+    backgroundSprite: 'nora_hospital',
+    tableSprite: 'nora_gurney',
+    lightType: 'fluorescent_cold',
+    particles: ['flicker'],
+    gatekeeperVariant: 'clipboard',
+    musicTheme: 'nora_theme',
+  ),
+  introScene: [
+    DialogueLine(type: DialogueType.stage, text: '(revisa el clipboard sin mirar al paciente)'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Habitación catorce. Revisada.'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Todo en orden.'),
+    DialogueLine(type: DialogueType.stage, text: '(anota algo, guarda el clipboard bajo el brazo)'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Trece años haciendo esto y el papeleo nunca cambia.'),
+    DialogueLine(type: DialogueType.stage, text: '(mira al paciente por primera vez)'),
+    DialogueLine(type: DialogueType.dialogue, text: 'Descansa.'),
+    DialogueLine(type: DialogueType.stage, text: '(camina hacia la puerta, la abre)'),
+    DialogueLine(type: DialogueType.transitionStart, text: 'Buenas noches.'),
+  ],
   fragments: [
     StoryFragment(
       round: 1,
@@ -265,6 +370,8 @@ la mayoría de las personas pueden imaginar.
 "Interesante profesión", dice The Gatekeeper.
 "Siempre en la línea entre mis dominios y los tuyos."
 ''',
+      winText: 'Nora. Enfermera. Las manos que cuidan.',
+      loseText: 'El nombre se pierde en el pasillo.',
     ),
     StoryFragment(
       round: 2,
@@ -281,6 +388,8 @@ Las familias te agradecían con lágrimas en los ojos.
 
 "Una santa", te llamaban.
 ''',
+      winText: 'San Vicente. El turno de noche. Los pasillos vacíos.',
+      loseText: 'El hospital se desvanece en la niebla.',
     ),
     StoryFragment(
       round: 3,
@@ -297,6 +406,8 @@ La mañana siguiente, su cama estaba vacía.
 "Murió en paz", le dijiste a la familia.
 Ellos te abrazaron, agradecidos.
 ''',
+      winText: 'Don Eduardo. La última noche. El silencio.',
+      loseText: 'Hay rostros que prefieres olvidar.',
     ),
     StoryFragment(
       round: 4,
@@ -312,6 +423,8 @@ No como algo que aliviar... sino como algo que terminar.
 
 The Gatekeeper inclina la cabeza. "Continúa."
 ''',
+      winText: 'El cambio. La decisión. El primer paso.',
+      loseText: 'Algunas decisiones no se olvidan.',
     ),
     StoryFragment(
       round: 5,
@@ -328,6 +441,8 @@ estaban tan graves.
 
 Pero tú sabías mejor. Tú sabías cuándo era "el momento".
 ''',
+      winText: 'Las noches. Los ajustes. Las decisiones.',
+      loseText: 'Lo que pasa en la noche...',
     ),
     StoryFragment(
       round: 6,
@@ -344,6 +459,8 @@ Los pacientes te pedían por nombre.
 
 The Gatekeeper sonríe. "Ángel. Qué palabra tan interesante."
 ''',
+      winText: 'La máscara perfecta. El ángel.',
+      loseText: 'La verdad detrás de la sonrisa.',
     ),
     StoryFragment(
       round: 7,
