@@ -1,9 +1,10 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/constants.dart';
 
-/// Pantalla de intro animada según GDD v1.3
-/// Secuencia: Título → Manos → Cartas → Arco → Carta roja → Menú
+/// Pantalla de intro según GDD v1.4
+/// Secuencia: Título → Manos → Cartas en CÍRCULO → Carta roja → Menú
 class IntroScreen extends StatefulWidget {
   final VoidCallback onComplete;
 
@@ -13,12 +14,8 @@ class IntroScreen extends StatefulWidget {
   State<IntroScreen> createState() => _IntroScreenState();
 }
 
-class _IntroScreenState extends State<IntroScreen>
-    with TickerProviderStateMixin {
+class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin {
   int _currentFrame = 0;
-  bool _showMenu = false;
-  String _menuText = '';
-  int _menuTextIndex = 0;
 
   @override
   void initState() {
@@ -35,11 +32,11 @@ class _IntroScreenState extends State<IntroScreen>
     setState(() => _currentFrame = 1);
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Frame 3: Carta + separación (1 seg)
+    // Frame 3: Carta + separación en círculo (1 seg)
     setState(() => _currentFrame = 2);
     await Future.delayed(const Duration(milliseconds: 1000));
 
-    // Frame 4: Arco de 10 cartas (0.3 seg)
+    // Frame 4: Círculo de 10 cartas (0.3 seg)
     setState(() => _currentFrame = 3);
     await Future.delayed(const Duration(milliseconds: 300));
 
@@ -47,27 +44,9 @@ class _IntroScreenState extends State<IntroScreen>
     setState(() => _currentFrame = 4);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // Frame 6: Menú aparece letra por letra (0.4 seg)
-    setState(() {
-      _currentFrame = 5;
-      _showMenu = true;
-    });
-    await _typeMenuText();
-
-    // Esperar un poco antes de permitir interacción
-    await Future.delayed(const Duration(milliseconds: 500));
-  }
-
-  Future<void> _typeMenuText() async {
-    const menuItems = 'STORY · FREE PLAY · SETTINGS';
-    for (int i = 0; i <= menuItems.length; i++) {
-      if (!mounted) return;
-      setState(() {
-        _menuTextIndex = i;
-        _menuText = menuItems.substring(0, i);
-      });
-      await Future.delayed(const Duration(milliseconds: 15));
-    }
+    // Frame 6: Menú aparece (0.4 seg)
+    setState(() => _currentFrame = 5);
+    await Future.delayed(const Duration(milliseconds: 800));
   }
 
   @override
@@ -90,13 +69,13 @@ class _IntroScreenState extends State<IntroScreen>
       case 1:
         return _buildHandsFrame();
       case 2:
-        return _buildCardsSeparatingFrame();
+        return _buildCardsExpandingFrame();
       case 3:
-        return _buildArcFrame();
+        return _buildCircleFrame();
       case 4:
         return _buildRedCardFrame();
       case 5:
-        return _buildMenuFrame();
+        return _buildFinalFrame();
       default:
         return const SizedBox.shrink();
     }
@@ -108,7 +87,7 @@ class _IntroScreenState extends State<IntroScreen>
       'XI',
       style: TextStyle(
         color: Colors.white,
-        fontSize: 120,
+        fontSize: 100,
         fontWeight: FontWeight.bold,
         letterSpacing: 20,
       ),
@@ -119,138 +98,146 @@ class _IntroScreenState extends State<IntroScreen>
         .fadeOut(duration: 400.ms);
   }
 
-  /// Frame 2: Manos huesudas entran desde los laterales
+  /// Frame 2: Manos huesudas entran
   Widget _buildHandsFrame() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _buildSkeletonHand(isLeft: true)
             .animate()
-            .slideX(begin: -2, end: 0, duration: 400.ms, curve: Curves.easeOut)
+            .slideX(begin: -2, end: 0, duration: 400.ms)
             .fadeIn(duration: 300.ms),
-        const SizedBox(width: 120),
+        const SizedBox(width: 200),
         _buildSkeletonHand(isLeft: false)
             .animate()
-            .slideX(begin: 2, end: 0, duration: 400.ms, curve: Curves.easeOut)
+            .slideX(begin: 2, end: 0, duration: 400.ms)
             .fadeIn(duration: 300.ms),
       ],
     );
   }
 
-  /// Frame 3: Carta aparece y se clona mientras manos se separan
-  Widget _buildCardsSeparatingFrame() {
+  /// Frame 3: Carta se clona y expande en círculo
+  Widget _buildCardsExpandingFrame() {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
       duration: const Duration(milliseconds: 1000),
       builder: (context, progress, child) {
         final cardCount = (progress * 10).ceil().clamp(1, 10);
-        final separation = progress * 200;
+        final radius = progress * 100;
 
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // Manos separándose
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Transform.translate(
-                  offset: Offset(-separation / 2, 0),
+        return SizedBox(
+          width: 300,
+          height: 300,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Manos separándose
+              Positioned(
+                left: 20 - progress * 60,
+                child: Opacity(
+                  opacity: 1 - progress * 0.3,
                   child: _buildSkeletonHand(isLeft: true),
                 ),
-                SizedBox(width: 120 + separation),
-                Transform.translate(
-                  offset: Offset(separation / 2, 0),
+              ),
+              Positioned(
+                right: 20 - progress * 60,
+                child: Opacity(
+                  opacity: 1 - progress * 0.3,
                   child: _buildSkeletonHand(isLeft: false),
                 ),
-              ],
-            ),
-            // Cartas multiplicándose
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(cardCount, (i) {
-                final offset = (i - (cardCount - 1) / 2) * 20;
+              ),
+              // Cartas expandiéndose en círculo
+              ...List.generate(cardCount, (i) {
+                final angle = (i / 10) * 2 * math.pi - math.pi / 2;
                 return Transform.translate(
-                  offset: Offset(offset, 0),
-                  child: _buildCard(
-                    index: i,
-                    showSilhouette: false,
+                  offset: Offset(
+                    math.cos(angle) * radius,
+                    math.sin(angle) * radius,
+                  ),
+                  child: Transform.rotate(
+                    angle: angle + math.pi / 2,
+                    child: _buildCard(i),
                   ),
                 );
               }),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
-  /// Frame 4: Las 10 cartas forman un arco
-  Widget _buildArcFrame() {
+  /// Frame 4: Círculo completo de 10 cartas
+  Widget _buildCircleFrame() {
     return SizedBox(
-      width: 350,
-      height: 200,
+      width: 320,
+      height: 320,
       child: Stack(
         alignment: Alignment.center,
-        children: List.generate(10, (i) {
-          final angle = (i - 4.5) * 0.12;
-          final yOffset = (i - 4.5).abs() * 8;
-
-          return Transform.translate(
-            offset: Offset((i - 4.5) * 32, yOffset),
-            child: Transform.rotate(
-              angle: angle,
-              child: _buildCard(
-                index: i,
-                showSilhouette: true,
-                small: true,
+        children: [
+          // Manos a los lados
+          Positioned(left: 0, child: _buildSkeletonHand(isLeft: true)),
+          Positioned(right: 0, child: _buildSkeletonHand(isLeft: false)),
+          // Círculo de cartas
+          ...List.generate(10, (i) {
+            final angle = (i / 10) * 2 * math.pi - math.pi / 2;
+            const radius = 110.0;
+            return Transform.translate(
+              offset: Offset(
+                math.cos(angle) * radius,
+                math.sin(angle) * radius,
               ),
-            ),
-          );
-        })
-            .animate(interval: 30.ms)
-            .fadeIn(duration: 100.ms)
-            .slideY(begin: 0.5, end: 0, duration: 200.ms),
+              child: Transform.rotate(
+                angle: angle + math.pi / 2,
+                child: _buildCard(i, showDetails: true),
+              ),
+            );
+          })
+              .animate(interval: 30.ms)
+              .fadeIn(duration: 100.ms),
+        ],
       ),
     );
   }
 
-  /// Frame 5: Carta roja (11) aparece en el centro con flash dorado
+  /// Frame 5: Carta roja aparece en el centro con flash
   Widget _buildRedCardFrame() {
     return SizedBox(
-      width: 350,
-      height: 250,
+      width: 320,
+      height: 320,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Arco de cartas azules
+          // Manos
+          Positioned(left: 0, child: _buildSkeletonHand(isLeft: true)),
+          Positioned(right: 0, child: _buildSkeletonHand(isLeft: false)),
+          // Círculo de cartas
           ...List.generate(10, (i) {
-            final angle = (i - 4.5) * 0.12;
-            final yOffset = (i - 4.5).abs() * 8;
-
+            final angle = (i / 10) * 2 * math.pi - math.pi / 2;
+            const radius = 110.0;
             return Transform.translate(
-              offset: Offset((i - 4.5) * 32, yOffset - 30),
+              offset: Offset(
+                math.cos(angle) * radius,
+                math.sin(angle) * radius,
+              ),
               child: Transform.rotate(
-                angle: angle,
-                child: _buildCard(
-                  index: i,
-                  showSilhouette: true,
-                  small: true,
-                ),
+                angle: angle + math.pi / 2,
+                child: _buildCard(i, showDetails: true),
               ),
             );
           }),
-          // Carta roja central con flash
+          // Carta roja central
           Container(
-            width: 70,
-            height: 100,
+            width: 60,
+            height: 85,
             decoration: BoxDecoration(
               color: XIColors.cardRed,
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: XIColors.secondary, width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: XIColors.primary.withValues(alpha: 0.6),
-                  blurRadius: 20,
+                  color: XIColors.primary.withValues(alpha: 0.7),
+                  blurRadius: 25,
                   spreadRadius: 5,
                 ),
               ],
@@ -259,8 +246,8 @@ class _IntroScreenState extends State<IntroScreen>
               child: Text(
                 'XI',
                 style: TextStyle(
-                  color: XIColors.secondary,
-                  fontSize: 28,
+                  color: XIColors.primary,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -268,50 +255,50 @@ class _IntroScreenState extends State<IntroScreen>
           )
               .animate()
               .scale(begin: const Offset(0, 0), end: const Offset(1, 1), duration: 200.ms)
-              .shimmer(duration: 300.ms, color: XIColors.primary),
+              .shimmer(duration: 400.ms, color: XIColors.primary),
         ],
       ),
     );
   }
 
-  /// Frame 6: Menú aparece letra por letra sobre la carta roja
-  Widget _buildMenuFrame() {
+  /// Frame 6: Frame final con menú
+  Widget _buildFinalFrame() {
     return SizedBox(
-      width: 350,
-      height: 300,
+      width: 320,
+      height: 380,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Arco de cartas azules
+          // Manos
+          Positioned(left: 0, top: 50, child: _buildSkeletonHand(isLeft: true)),
+          Positioned(right: 0, top: 50, child: _buildSkeletonHand(isLeft: false)),
+          // Círculo de cartas
           ...List.generate(10, (i) {
-            final angle = (i - 4.5) * 0.12;
-            final yOffset = (i - 4.5).abs() * 8;
-
+            final angle = (i / 10) * 2 * math.pi - math.pi / 2;
+            const radius = 110.0;
             return Transform.translate(
-              offset: Offset((i - 4.5) * 32, yOffset - 50),
+              offset: Offset(
+                math.cos(angle) * radius,
+                math.sin(angle) * radius,
+              ),
               child: Transform.rotate(
-                angle: angle,
-                child: _buildCard(
-                  index: i,
-                  showSilhouette: true,
-                  small: true,
-                ),
+                angle: angle + math.pi / 2,
+                child: _buildCard(i, showDetails: true),
               ),
             );
           }),
           // Carta roja central con menú
           Container(
-            width: 100,
-            height: 140,
+            width: 80,
+            height: 110,
             decoration: BoxDecoration(
               color: XIColors.cardRed,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(color: XIColors.secondary, width: 2),
               boxShadow: [
                 BoxShadow(
                   color: XIColors.primary.withValues(alpha: 0.4),
-                  blurRadius: 15,
-                  spreadRadius: 2,
+                  blurRadius: 20,
                 ),
               ],
             ),
@@ -322,141 +309,127 @@ class _IntroScreenState extends State<IntroScreen>
                   'XI',
                   style: TextStyle(
                     color: XIColors.primary,
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Container(width: 30, height: 1, color: XIColors.primary.withValues(alpha: 0.5)),
                 const SizedBox(height: 8),
-                Container(
-                  width: 40,
-                  height: 1,
-                  color: XIColors.primary.withValues(alpha: 0.5),
-                ),
-                const SizedBox(height: 12),
-                _buildMenuItem('STORY', 0),
-                _buildMenuItem('FREE', 1),
-                _buildMenuItem('CONFIG', 2),
+                _buildMiniMenuItem('STORY'),
+                _buildMiniMenuItem('FREE PLAY'),
+                _buildMiniMenuItem('CONFIG'),
               ],
             ),
           ),
-          // Texto "Toca para continuar"
+          // Indicador de continuar
           Positioned(
             bottom: 0,
             child: Text(
               'Toca para continuar',
               style: TextStyle(
-                color: XIColors.textMuted.withValues(alpha: 0.6),
-                fontSize: 12,
+                color: XIColors.textMuted.withValues(alpha: 0.5),
+                fontSize: 11,
               ),
-            ).animate(onPlay: (c) => c.repeat()).fadeIn().then().fadeOut(),
+            ).animate(onPlay: (c) => c.repeat(reverse: true)).fadeIn().then().fadeOut(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem(String text, int index) {
-    final delay = index * 100;
+  Widget _buildMiniMenuItem(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Text(
         text,
         style: const TextStyle(
           color: XIColors.textSecondary,
-          fontSize: 8,
-          letterSpacing: 1,
+          fontSize: 7,
+          letterSpacing: 0.5,
         ),
       ),
-    ).animate(delay: Duration(milliseconds: delay)).fadeIn(duration: 150.ms);
+    ).animate(delay: 100.ms).fadeIn(duration: 150.ms);
   }
 
-  /// Mano esquelética pixel art
   Widget _buildSkeletonHand({required bool isLeft}) {
-    return Container(
+    return SizedBox(
       width: 50,
-      height: 70,
-      decoration: BoxDecoration(
-        color: XIColors.surface,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: XIColors.textMuted.withValues(alpha: 0.5), width: 1),
-      ),
+      height: 80,
       child: CustomPaint(
         painter: _SkeletonHandPainter(isLeft: isLeft),
       ),
     );
   }
 
-  /// Carta del mazo con silueta opcional
-  Widget _buildCard({
-    required int index,
-    bool showSilhouette = false,
-    bool small = false,
-  }) {
-    final width = small ? 28.0 : 40.0;
-    final height = small ? 42.0 : 60.0;
-
-    // Nombres de personajes para las cartas
-    final names = ['OWEN', 'NORA', '???', '???', '???', '???', '???', '???', '???', '???'];
+  Widget _buildCard(int index, {bool showDetails = false}) {
     final cardValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
+    final names = ['OWEN', 'NORA', '???', '???', '???', '???', '???', '???', '???', '???'];
+    final isUnlocked = index < 2;
 
     return Container(
-      width: width,
-      height: height,
-      margin: const EdgeInsets.symmetric(horizontal: 2),
+      width: 35,
+      height: 50,
       decoration: BoxDecoration(
         color: XIColors.cardBlue,
         borderRadius: BorderRadius.circular(3),
         border: Border.all(
-          color: index < 2 ? XIColors.primary : XIColors.textMuted.withValues(alpha: 0.5),
+          color: isUnlocked ? XIColors.primary : XIColors.textMuted.withValues(alpha: 0.4),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 4,
-            offset: const Offset(1, 2),
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 3,
+            offset: const Offset(1, 1),
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Valor de la carta
-          Text(
-            cardValues[index],
-            style: TextStyle(
-              color: index < 2 ? XIColors.primary : XIColors.textMuted,
-              fontSize: small ? 10 : 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (showSilhouette && !small) ...[
-            const SizedBox(height: 2),
-            // Silueta simplificada
-            Container(
-              width: 20,
-              height: 15,
-              decoration: BoxDecoration(
-                color: XIColors.background.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(2),
+      child: showDetails
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  cardValues[index],
+                  style: TextStyle(
+                    color: isUnlocked ? XIColors.primary : XIColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (isUnlocked) ...[
+                  const SizedBox(height: 2),
+                  Container(
+                    width: 15,
+                    height: 12,
+                    color: XIColors.background.withValues(alpha: 0.5),
+                  ),
+                ],
+                const SizedBox(height: 2),
+                Text(
+                  names[index],
+                  style: TextStyle(
+                    color: XIColors.textMuted.withValues(alpha: 0.6),
+                    fontSize: 4,
+                  ),
+                ),
+              ],
+            )
+          : Center(
+              child: Text(
+                'XI',
+                style: TextStyle(
+                  color: XIColors.primary.withValues(alpha: 0.6),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              names[index],
-              style: TextStyle(
-                color: XIColors.textMuted.withValues(alpha: 0.7),
-                fontSize: 5,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
 
-/// Painter para dibujar manos esqueléticas
+/// Painter para manos esqueléticas
 class _SkeletonHandPainter extends CustomPainter {
   final bool isLeft;
 
@@ -467,28 +440,43 @@ class _SkeletonHandPainter extends CustomPainter {
     final paint = Paint()
       ..color = XIColors.textMuted.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
 
     final centerX = size.width / 2;
-    final centerY = size.height / 2;
+    final palmY = size.height * 0.6;
 
     // Palma
-    canvas.drawCircle(Offset(centerX, centerY + 10), 12, paint);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(centerX, palmY), width: 25, height: 30),
+      paint,
+    );
 
-    // Dedos (5 líneas)
+    // Dedos
+    final fingerLengths = [22.0, 30.0, 32.0, 28.0, 18.0];
+    final fingerAngles = isLeft
+        ? [-0.4, -0.2, 0.0, 0.2, 0.4]
+        : [0.4, 0.2, 0.0, -0.2, -0.4];
+
     for (int i = 0; i < 5; i++) {
-      final angle = (isLeft ? -1 : 1) * (i - 2) * 0.25;
-      final startX = centerX + (i - 2) * 6;
-      final startY = centerY - 5;
-      final endX = startX + (isLeft ? -1 : 1) * angle * 15;
-      final endY = startY - 20;
+      final startX = centerX + (i - 2) * 5;
+      final startY = palmY - 12;
+      final angle = fingerAngles[i];
+      final length = fingerLengths[i];
 
-      canvas.drawLine(
-        Offset(startX, startY),
-        Offset(endX, endY),
-        paint,
-      );
+      final endX = startX + math.sin(angle) * length;
+      final endY = startY - math.cos(angle) * length;
+
+      canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
+      canvas.drawCircle(Offset(startX, startY), 2, paint);
     }
+
+    // Muñeca
+    canvas.drawLine(
+      Offset(centerX, palmY + 15),
+      Offset(centerX, size.height),
+      paint,
+    );
   }
 
   @override
